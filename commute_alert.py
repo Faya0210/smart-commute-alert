@@ -26,12 +26,12 @@ def get_weather_and_air_quality():
   max_temp = weather_data["daily"]["temperature_2m_max"][0]
   max_rain_prob = weather_data["daily"]["precipitation_probability_max"][0]
 
-  # 2. 空氣品質 API
+  # 2. 空氣品質 API（改用 hourly 抓取 us_aqi 並計算當日最大值）
   air_url = "https://air-quality-api.open-meteo.com/v1/air-quality"
   air_params = {
       "latitude": LATITUDE,
       "longitude": LONGITUDE,
-      "daily": "us_aqi_max",
+      "hourly": "us_aqi",
       "timezone": "Asia/Taipei",
       "forecast_days": 1,
   }
@@ -39,7 +39,8 @@ def get_weather_and_air_quality():
   air_resp.raise_for_status()
   air_data = air_resp.json()
 
-  max_aqi = air_data["daily"]["us_aqi_max"][0]
+  aqi_list = [v for v in air_data["hourly"]["us_aqi"] if v is not None]
+  max_aqi = max(aqi_list) if aqi_list else 0
 
   return forecast_date, max_temp, max_rain_prob, max_aqi
 
@@ -73,25 +74,20 @@ def main():
     # 多重條件判斷
     advice_list = []
 
-    # 1. 降雨機率達 60% 提醒攜帶雨傘
     if max_rain_prob >= 60:
       advice_list.append("☔ 今日降雨機率較高，出門請攜帶雨傘。")
 
-    # 2. 最高溫度達 33°C 提醒防曬與補充水分
     if max_temp >= 33:
       advice_list.append("☀️ 氣溫偏高，請注意防曬並多補充水分。")
 
-    # 3. AQI 達 100 提醒配戴口罩
     if max_aqi >= 100:
       advice_list.append("😷 空氣品質較差 (AQI >= 100)，建議配戴口罩。")
 
-    # 4. 若所有條件皆正常，顯示適合外出通勤
     if not advice_list:
       advice_text = "✅ 各項指標良好，今日非常適合外出通勤！"
     else:
       advice_text = "\n".join(advice_list)
 
-    # 組合訊息
     message = (
         f"🚨【智慧通勤風險通知】🚨\n\n"
         f"📅 日期：{forecast_date}\n"
